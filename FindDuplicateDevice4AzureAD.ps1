@@ -116,7 +116,7 @@ class CsvRecode {
 }
 
 # 定数
-$GC_StatusOriginal = "Original"
+$GC_StatusOriginal = "Newest"
 $GC_StatusDuplicate = "Duplicate"
 $GC_OperationRemove = "Remove"
 
@@ -145,24 +145,24 @@ function Log(
 	$Log = $Now.ToString("yyyy/MM/dd HH:mm:ss.fff") + " "
 	$Log += $LogString
 
-	# ログデバイス名が設定されていなかったらデフォルトのログデバイス名をつける
+	# ログファイル名が設定されていなかったらデフォルトのログファイル名をつける
 	if( $GC_LogName -eq $null ){
 		$GC_LogName = "LOG"
 	}
 
-	# ログデバイス名(XXXX_YYYY-MM-DD.log)
-	$LogDevice = $GC_LogName + "_" +$Now.ToString("yyyy-MM-dd") + ".log"
+	# ログファイル名(XXXX_YYYY-MM-DD.log)
+	$LogFile = $GC_LogName + "_" +$Now.ToString("yyyy-MM-dd") + ".log"
 
 	# ログフォルダーがなかったら作成
 	if( -not (Test-Path $GC_LogPath) ) {
 		New-Item $GC_LogPath -Type Directory
 	}
 
-	# ログデバイス名
-	$LogDeviceName = Join-Path $GC_LogPath $LogDevice
+	# ログファイル名
+	$LogFileName = Join-Path $GC_LogPath $LogFile
 
 	# ログ出力
-	Write-Output $Log | Out-Device -DevicePath $LogDeviceName -Encoding Default -append
+	Write-Output $Log | Out-File -FilePath $LogFileName -Encoding Default -append
 
 	# echo
 	[System.Console]::WriteLine($Log)
@@ -237,6 +237,9 @@ filter KeyBreak{
 				# デバイス名重複
 				$TmpRec.Status = $GC_StatusDuplicate
 
+				# フラグクリア
+				$FirstNameFlag = $true
+
 				# 重複データ
 				return $TmpRec
 			}
@@ -263,9 +266,20 @@ filter KeyBreak{
 # Sort
 ###################################################
 function DataSort($TergetDevicesData){
-	[array]$SortDevicesData = $TergetDevicesData | Sort-Object -Property `
-													DisplayName,
-													ApproximateLastLogonTimeStamp
+
+	# Sort Key
+	$DeviceNameKey = @{
+		Expression = "DeviceName"
+		Descending = $false
+	}
+
+	$LastLogonKey = @{
+		Expression = "LastLogon"
+		Descending = $true
+	}
+
+	# Sort
+	[array]$SortDevicesData = $TergetDevicesData | Sort-Object -Property $DeviceNameKey, $LastLogonKey
 
 	return $SortDevicesData
 }
@@ -308,7 +322,6 @@ function OutputDuplicateData([array]$SortDevicesData, $Now){
 function DeviceOperation( [array]$DuplicateDevices ){
 
 	$DuplicateDeviceCount = $DuplicateDevices.Count
-	$OperationCount = 0
 
 	for( $i = 0; $i -lt $DuplicateDeviceCount; $i++ ){
 		# デバイス名重複
@@ -318,25 +331,24 @@ function DeviceOperation( [array]$DuplicateDevices ){
 			$DuplicateDeviceObjectId = $DuplicateDevices[$i].ObjectId
 			$DuplicateDeviceName = $DuplicateDevices[$i].DeviceName
 
-			# デバイス重複
-			# オペレーション : Remove
+			# 重複デバイス削除
 			if( $Remove ){
 				$DuplicateDevices[$i].Operation = $GC_OperationRemove
-
-				if( -not $WhatIf ){
-					# 削除
-					Remove-AzureADDevice -ObjectId $DuplicateDevice
-				}
-
 				Log "[INFO] Device duplicate (Remove) : $DuplicateDeviceName / $DuplicateDeviceObjectId"
 
-					$OperationCount++
+				if( -not $WhatIf ){
+					try{
+						# 削除
+						Remove-AzureADDevice -ObjectId $DuplicateDeviceObjectId -ErrorAction Stop
+					}
+					catch{
+						Log "[ERROR] Device remove error : $DuplicateDeviceName / $DuplicateDeviceObjectId"
+					}
 				}
 			}
 		}
 	}
-
-	return $OperationCount
+	return $DuplicateDevices
 }
 
 ###################################################
@@ -349,7 +361,8 @@ try{
 	Connect-AzureAD -ErrorAction Stop
 }
 catch{
-	Log "Azure login fail !"
+	Log "[FAIL] Azure login fail !"
+	Log "[INFO] ============== END =============="
 	exit
 }
 
@@ -367,50 +380,48 @@ $TergetDevicesDataCount = $TergetDevicesData.Count
 # 対象0件なら処理しない
 if( $TergetDevicesDataCount -eq 0 ){
 	Log "[INFO] Terget Devices is zero."
+	Log "[INFO] ============== END =============="
+	exit
 }
-else{
-	# 対象デバイス数表示
-	Log "[INFO] Terget Devices count : $TergetDevicesDataCount"
 
-	# Data Sort
-	Log "[INFO] Data sort."
-	[array]$SortDevicesData = DataSort $TergetDevicesData
+# 対象デバイス数表示
+Log "[INFO] Terget Devices count : $TergetDevicesDataCount"
 
-	# 出力デバイス用処理時間
-	$Now = Get-Date
+# Data Sort
+Log "[INFO] Data sort."
+[array]$SortDevicesData = DataSort $TergetDevicesData
 
-	# 全デバイスリスト出力
-	if( $AllList -eq $true ){
-		Log "[INFO] Output all data"
-		OutputAllData $SortDevicesData $Now
-	}
+# 出力デバイス用処理時間
+$Now = Get-Date
 
-	# 重複デバイス検出
-	Log "[INFO] Get duplicate Devices."
-	[array]$DuplicateDevices = $SortDevicesData | KeyBreak
-
-	# 重複デバイス数
-	$DuplicateDeviceCount = $DuplicateDevices.Count
-
-	# 重複 0 件なら処理しない
-	if($DuplicateDeviceCount -eq 0){
-		Log "[INFO] Duplicate Device is zero."
-	}
-	else{
-		# 重複デバイス数表示
-		Log "[INFO] Duplicate Device count : $DuplicateDeviceCount"
-
-		# 重複デバイス操作
-		Log "[INFO] Device operation"
-		$Counter = DeviceOperation $DuplicateDevices
-
-		if( $Counter -ne 0 ){
-			Log "[INFO] Device deduplication count : $Counter"
-		}
-
-		# 重複データ出力
-		OutputDuplicateData $DuplicateDevices $Now
-	}
+# 全デバイスリスト出力
+if( $AllList -eq $true ){
+	Log "[INFO] Output all data"
+	OutputAllData $SortDevicesData $Now
 }
+
+# 重複デバイス検出
+Log "[INFO] Get duplicate Devices."
+[array]$DuplicateDevices = $SortDevicesData | KeyBreak
+
+# 重複デバイス数
+$DuplicateDeviceCount = $DuplicateDevices.Count
+
+# 重複 0 件なら処理しない
+if($DuplicateDeviceCount -eq 0){
+	Log "[INFO] Duplicate Device is zero."
+	Log "[INFO] ============== END =============="
+	exit
+}
+
+# 重複デバイス数表示
+Log "[INFO] Duplicate Device count : $DuplicateDeviceCount"
+
+# 重複デバイス操作
+Log "[INFO] Device operation"
+[array]$DuplicateDevices = DeviceOperation $DuplicateDevices
+
+# 重複データ出力
+OutputDuplicateData $DuplicateDevices $Now
 
 Log "[INFO] ============== END =============="
