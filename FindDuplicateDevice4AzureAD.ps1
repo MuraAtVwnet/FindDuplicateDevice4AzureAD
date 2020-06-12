@@ -65,10 +65,6 @@ CSV の出力先
 
 .PARAMETER WhatIf
 実際の削除はせず、動作確認だけします
-
-.LINK
-重複したデバイス排除するスクリプト(PowerShell)
-http://www.vwnet.jp/Windows/PowerShell/2018111601/FindDuplicateDevice.htm
 #>
 
 ###################################################
@@ -357,9 +353,11 @@ if( $PSVersionTable.PSVersion.Major -ne 5 ){
 	exit
 }
 
-# モジュールインストール確認
-$Result = Get-Module -Name AzureAD
-if( $Result -eq $null ){
+# モジュール ロード
+try{
+	Import-Module -Name AzureAD -ErrorAction Stop
+}
+catch{
 	# 管理権限で起動されているか確認
 	if (-not(([Security.Principal.WindowsPrincipal] `
 		[Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
@@ -379,9 +377,10 @@ if( $Result -eq $null ){
 }
 
 # Azure AD Login
-$Credential = Get-Credential -Message "Azure の ID / Password を入力してください"
+# $Credential = Get-Credential -Message "Azure の ID / Password を入力してください"
 try{
-	Connect-AzureAD -Credential $Credential -ErrorAction Stop
+	# Connect-AzureAD -Credential $Credential -ErrorAction Stop
+	Connect-AzureAD -ErrorAction Stop
 }
 catch{
 	Log "[FAIL] Azure login fail !"
