@@ -96,12 +96,6 @@ else{
 	$GC_LogPath = $LogPath
 }
 
-# Windows PowerShell 以外はサポートされていない
-if( $PSVersionTable.PSVersion.Major -ge 6 ){
-	Log "[FAIL] PowerShell Core is not supported."
-	exit
-}
-
 # ログファイル名
 $GC_LogName = "FindDuplicateDevice(AzureAD)"
 
@@ -356,9 +350,36 @@ function DeviceOperation( [array]$DuplicateDevices ){
 ###################################################
 Log "[INFO] ============== START =============="
 
-$Credential = Get-Credential
+# 動作環境確認
+if( $PSVersionTable.PSVersion.Major -ne 5 ){
+	Log "[FAIL] このスクリプトは Windows PowerShell 5 のみサポートしています"
+	Log "[INFO] ============== END =============="
+	exit
+}
+
+# モジュールインストール確認
+$Result = Get-Module -Name AzureAD
+if( $Result -eq $null ){
+	# 管理権限で起動されているか確認
+	if (-not(([Security.Principal.WindowsPrincipal] `
+		[Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
+		[Security.Principal.WindowsBuiltInRole] "Administrator"`
+		))) {
+
+		Log "[INFO] 必要モジュールがインストールされていません"
+		Log "[INFO] 管理権限で起動してスクリプトを実行するか、管理権限で以下コマンドを実行してください"
+		Log "[INFO] Install-Module -Name AzureAD"
+		Log "[INFO] ============== END =============="
+		exit
+	}
+
+	# 管理権限で実行されているのでモジュールをインストールする
+	Log "[INFO] 必要モジュールをインストールします"
+	Install-Module -Name AzureAD
+}
 
 # Azure AD Login
+$Credential = Get-Credential -Message "Azure の ID / Password を入力してください"
 try{
 	Connect-AzureAD -Credential $Credential -ErrorAction Stop
 }
