@@ -414,7 +414,7 @@ Log "[INFO] Terget Devices count : $TergetDevicesDataCount"
 Log "[INFO] Data sort."
 [array]$SortDevicesData = DataSort $TergetDevicesData
 
-# 出力デバイス用処理時間
+# 出力ファイル用処理時間
 $Now = Get-Date
 
 # 全デバイスリスト出力
