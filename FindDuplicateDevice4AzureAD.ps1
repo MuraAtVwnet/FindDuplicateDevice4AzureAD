@@ -356,9 +356,11 @@ function DeviceOperation( [array]$DuplicateDevices ){
 ###################################################
 Log "[INFO] ============== START =============="
 
+$Credential = Get-Credential
+
 # Azure AD Login
 try{
-	Connect-AzureAD -ErrorAction Stop
+	Connect-AzureAD -Credential $Credential -ErrorAction Stop
 }
 catch{
 	Log "[FAIL] Azure login fail !"
