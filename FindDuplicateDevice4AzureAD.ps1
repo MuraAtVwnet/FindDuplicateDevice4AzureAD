@@ -29,24 +29,37 @@ CSV 出力ディレクトリ指定(-CSVPath)
 全デバイス リスト出力(-AllList)
     重複確認する全デバイス リストを CSV 出力します
 
+資格情報を使用する(-UseCredential)
+    Web 対話ログインではなく、資格情報を使用します
+
 .EXAMPLE
 PS C:\Test> .\FindDuplicateDevice4AzureAD.ps1
 デバイス重複リストを出力します
 
+.EXAMPLE
 PS C:\Test> .\FindDuplicateDevice4AzureAD.ps1 -AllList
 全デバイスとデバイス重複リストを出力します
 
+.EXAMPLE
 PS C:\Test> .\FindDuplicateDevice4AzureAD.ps1 -Remove
 重複したデバイスを削除し、全デバイスと重複リストを出力します
 
+.EXAMPLE
 PS C:\Test> .\FindDuplicateDevice4AzureAD.ps1 -Remove -WhatIf
 重複したデバイスを削除テストをし(削除はしません)、デバイス重複リストを出力します
 
+.EXAMPLE
 PS C:\Test> .\FindDuplicateDevice4AzureAD.ps1 -CSVPath C:\CSV
 デバイス重複リストを C:\CSV に出力します
 
+.EXAMPLE
 PS C:\Test> .\FindDuplicateDevice4AzureAD.ps1 -LogPath C:\Log
 実行ログを C:\Log に出力します
+
+.EXAMPLE
+PS C:\Test> .\FindDuplicateDevice4AzureAD.ps1 -UseCredential
+Web 対話ログインではなく、資格情報を使用します
+
 
 .PARAMETER Remove
 重複デバイスを削除します
@@ -63,6 +76,9 @@ CSV の出力先
 .PARAMETER AllList
 重複確認する全デバイス リストを CSV 出力します
 
+.PARAMETER UseCredential
+Web 対話ログインではなく資格情報を使用します
+
 .PARAMETER WhatIf
 実際の削除はせず、動作確認だけします
 #>
@@ -75,6 +91,7 @@ Param(
 	[string]$CSVPath,			# CSV 出力 Path
 	[string]$LogPath,			# ログ出力ディレクトリ
 	[switch]$AllList,			# 全リスト出力
+	[switch]$UseCredential,		# 資格情報を使用する
 	[switch]$WhatIf				# テスト
 	)
 
@@ -377,10 +394,17 @@ catch{
 }
 
 # Azure AD Login
-# $Credential = Get-Credential -Message "Azure の ID / Password を入力してください"
+if( $UseCredential ){
+	$Credential = Get-Credential -Message "Azure の ID / Password を入力してください"
+}
+
 try{
-	# Connect-AzureAD -Credential $Credential -ErrorAction Stop
-	Connect-AzureAD -ErrorAction Stop
+	if( $UseCredential ){
+		Connect-AzureAD -Credential $Credential -ErrorAction Stop
+	}
+	else{
+		Connect-AzureAD -ErrorAction Stop
+	}
 }
 catch{
 	Log "[FAIL] Azure login fail !"
