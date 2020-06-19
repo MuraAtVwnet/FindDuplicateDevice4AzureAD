@@ -115,7 +115,7 @@ $GC_LogName = "FindDuplicateDevice(AzureAD)"
 # CSV レコード
 class CsvRecode {
 	[string] $DeviceName
-	[string] $LastLogon
+	[datetime] $LastLogon
 	[string] $ObjectID
 	[string] $DeviceID
 	[string] $Status
