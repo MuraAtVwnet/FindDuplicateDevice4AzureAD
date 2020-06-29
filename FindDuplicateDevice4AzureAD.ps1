@@ -112,26 +112,10 @@ else{
 # ログファイル名
 $GC_LogName = "FindDuplicateDevice(AzureAD)"
 
-# CSV レコード
-class CsvRecode {
-	[string] $DeviceName
-	[datetime] $LastLogon
-	[string] $ObjectID
-	[string] $DeviceID
-	[string] $Status
-	[string] $Operation
-}
-
 # 定数
 $GC_StatusOriginal = "Newest"
 $GC_StatusDuplicate = "Duplicate"
 $GC_OperationRemove = "Remove"
-
-
-# DeviceName = DisplayName
-# LastLogon = ApproximateLastLogonTimeStamp
-# ObjectID = ObjectId
-# DeviceID = DeviceId
 
 # Connect-AzureAD
 # $Devices = Get-AzureADDevice
@@ -175,29 +159,6 @@ function Log(
 	[System.Console]::WriteLine($Log)
 }
 
-
-###################################################
-# 必要データ取得
-###################################################
-filter GetDeviceData{
-
-	$DeviceData = New-Object CsvRecode
-
-	# デバイス名
-	$DeviceData.DeviceName = $_.DisplayName
-
-	# 最終ログイン日時
-	$DeviceData.LastLogon = $_.ApproximateLastLogonTimeStamp
-
-	# オブジェクト ID
-	$DeviceData.ObjectID = $_.ObjectId
-
-	# デバイス ID
-	$DeviceData.DeviceID = $_.DeviceId
-
-	return $DeviceData
-}
-
 ###################################################
 # 重複デバイス検出
 ###################################################
@@ -218,8 +179,10 @@ filter KeyBreak{
 		$OldKeyDeviceName = $NewKeyDeviceName
 		$OldRec = $NewRec
 
-		$NewKeyDeviceName = $_.DeviceName
+		$NewKeyDeviceName = $_.DisplayName
 		$NewRec = $_
+		Add-Member -InputObject $NewRec -MemberType NoteProperty -Name 'Status' -Value "" -Force
+		Add-Member -InputObject $NewRec -MemberType NoteProperty -Name 'Operation' -Value "" -Force
 
 		# デバイス名重複
 		if( $OldKeyDeviceName -eq $NewKeyDeviceName ){
@@ -276,12 +239,12 @@ function DataSort($TergetDevicesData){
 
 	# Sort Key
 	$DeviceNameKey = @{
-		Expression = "DeviceName"
+		Expression = "DisplayName"
 		Descending = $false
 	}
 
 	$LastLogonKey = @{
-		Expression = "LastLogon"
+		Expression = "ApproximateLastLogonTimeStamp"
 		Descending = $true
 	}
 
@@ -303,7 +266,12 @@ function OutputAllData([array]$DuplicateDevices, $Now){
 		mdkdir $CSVPath
 	}
 
-	$DuplicateDevices | Export-Csv -Path $OutputDevice -Encoding Default
+	$DuplicateDevices | Select-Object	DisplayName, `
+										ApproximateLastLogonTimeStamp, `
+										ObjectId, `
+										DeviceId, `
+										Status, `
+										Operation | Export-Csv -Path $OutputDevice -Encoding Default
 }
 
 
@@ -319,7 +287,12 @@ function OutputDuplicateData([array]$SortDevicesData, $Now){
 	if( -not(Test-Path $CSVPath)){
 		mdkdir $CSVPath
 	}
-	$DuplicateDevices | Export-Csv -Path $OutputDevice -Encoding Default
+	$DuplicateDevices | Select-Object	DisplayName, `
+										ApproximateLastLogonTimeStamp, `
+										ObjectId, `
+										DeviceId, `
+										Status, `
+										Operation | Export-Csv -Path $OutputDevice -Encoding Default
 }
 
 
@@ -418,7 +391,7 @@ if( $CSVPath -eq [string]$null){
 }
 
 # 全デバイスを取得
-[array]$TergetDevicesData = Get-AzureADDevice | GetDeviceData
+[array]$TergetDevicesData = Get-AzureADDevice
 
 # 対象デバイス数
 $TergetDevicesDataCount = $TergetDevicesData.Count
