@@ -391,7 +391,7 @@ if( $CSVPath -eq [string]$null){
 }
 
 # 全デバイスを取得
-[array]$TergetDevicesData = Get-AzureADDevice
+[array]$TergetDevicesData = Get-AzureADDevice -All $true
 
 # 対象デバイス数
 $TergetDevicesDataCount = $TergetDevicesData.Count
